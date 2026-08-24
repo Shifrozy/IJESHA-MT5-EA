@@ -1,0 +1,11 @@
+# MetaTrader / Compiler files
+*.log
+*.ini
+compile.log
+ijesha_test.ini
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
