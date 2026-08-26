@@ -355,16 +355,24 @@ bool IsInTradingSession()
 //+------------------------------------------------------------------+
 bool CopyIndicatorBuffers()
 {
-   int barsNeeded = MathMax(InpDivLookback + 5, InpEMAPeriod + 5);
+   int barsNeeded = MathMax(InpDivLookback + 5, InpSignalLookback + 5);
+   if(InpUseEMAFilter)
+      barsNeeded = MathMax(barsNeeded, MathMax(InpEMAPeriod, InpEMAFastPeriod) + 5);
    
    if(CopyBuffer(handleStoch, MAIN_LINE, 0, barsNeeded, stochK) <= 0)     return false;
    if(CopyBuffer(handleStoch, SIGNAL_LINE, 0, barsNeeded, stochD) <= 0)   return false;
    if(CopyBuffer(handleCCI, 0, 0, barsNeeded, cciBuffer) <= 0)            return false;
-   if(CopyBuffer(handleATR, 0, 0, barsNeeded, atrBuffer) <= 0)            return false;
-   if(CopyBuffer(handleSAR, 0, 0, barsNeeded, sarBuffer) <= 0)            return false;
-   if(CopyBuffer(handleEMA, 0, 0, barsNeeded, emaBuffer) <= 0)            return false;
-   if(CopyBuffer(handleEMAFast, 0, 0, barsNeeded, emaFastBuffer) <= 0)    return false;
-   if(CopyBuffer(handleRSI, 0, 0, barsNeeded, rsiBuffer) <= 0)            return false;
+   if(CopyBuffer(handleATR, 0, 0, 5, atrBuffer) <= 0)                     return false;
+   if(CopyBuffer(handleSAR, 0, 0, 5, sarBuffer) <= 0)                     return false;
+   if(InpUseEMAFilter)
+   {
+      if(CopyBuffer(handleEMA, 0, 0, 5, emaBuffer) <= 0)                  return false;
+      if(CopyBuffer(handleEMAFast, 0, 0, 5, emaFastBuffer) <= 0)          return false;
+   }
+   if(InpUseRSIFilter)
+   {
+      if(CopyBuffer(handleRSI, 0, 0, 5, rsiBuffer) <= 0)                  return false;
+   }
    
    return true;
 }
