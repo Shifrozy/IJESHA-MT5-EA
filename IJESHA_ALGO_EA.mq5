@@ -585,6 +585,16 @@ bool CheckSellSignal()
 }
 
 //+------------------------------------------------------------------+
+//| Get minimum allowed stop distance from broker                    |
+//+------------------------------------------------------------------+
+double GetMinStopDistance()
+{
+   long stopLevel = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+   double point   = symInfo.Point();
+   return MathMax((double)stopLevel * point, point * 15);
+}
+
+//+------------------------------------------------------------------+
 //| Execute BUY trade                                                |
 //+------------------------------------------------------------------+
 void ExecuteBuy()
@@ -592,19 +602,18 @@ void ExecuteBuy()
    double ask = symInfo.Ask();
    double point = symInfo.Point();
    double atr = atrBuffer[1];
+   double minDistance = GetMinStopDistance();
    
-   //--- Minimum ATR filter (avoid low volatility)
-   if(atr < point * 10)
-      return;
+   //--- Minimum ATR filter (avoid dead flat market)
+   if(atr < point * 2)
+      atr = point * 30; // fallback safe ATR
    
    //--- Calculate SL and TP based on ATR
-   double sl = NormalizeDouble(ask - atr * InpSLMultiplier, _Digits);
-   double tp = NormalizeDouble(ask + atr * InpTPMultiplier, _Digits);
+   double slDist = MathMax(atr * InpSLMultiplier, minDistance);
+   double tpDist = MathMax(atr * InpTPMultiplier, minDistance * 1.5);
    
-   //--- Ensure SL is below SAR for extra protection
-   double sarSL = NormalizeDouble(sarBuffer[1] - point * 5, _Digits);
-   if(sarSL > sl && sarSL < ask)
-      sl = sarSL;
+   double sl = NormalizeDouble(ask - slDist, _Digits);
+   double tp = NormalizeDouble(ask + tpDist, _Digits);
    
    //--- Execute trade
    if(trade.Buy(InpLotSize, _Symbol, ask, sl, tp, "IJESHA BUY"))
@@ -630,19 +639,18 @@ void ExecuteSell()
    double bid = symInfo.Bid();
    double point = symInfo.Point();
    double atr = atrBuffer[1];
+   double minDistance = GetMinStopDistance();
    
-   //--- Minimum ATR filter (avoid low volatility)
-   if(atr < point * 10)
-      return;
+   //--- Minimum ATR filter (avoid dead flat market)
+   if(atr < point * 2)
+      atr = point * 30; // fallback safe ATR
    
    //--- Calculate SL and TP based on ATR
-   double sl = NormalizeDouble(bid + atr * InpSLMultiplier, _Digits);
-   double tp = NormalizeDouble(bid - atr * InpTPMultiplier, _Digits);
+   double slDist = MathMax(atr * InpSLMultiplier, minDistance);
+   double tpDist = MathMax(atr * InpTPMultiplier, minDistance * 1.5);
    
-   //--- Ensure SL is above SAR for extra protection
-   double sarSL = NormalizeDouble(sarBuffer[1] + point * 5, _Digits);
-   if(sarSL < sl && sarSL > bid)
-      sl = sarSL;
+   double sl = NormalizeDouble(bid + slDist, _Digits);
+   double tp = NormalizeDouble(bid - tpDist, _Digits);
    
    //--- Execute trade
    if(trade.Sell(InpLotSize, _Symbol, bid, sl, tp, "IJESHA SELL"))
