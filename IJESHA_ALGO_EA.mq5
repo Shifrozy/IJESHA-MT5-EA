@@ -814,6 +814,15 @@ void DrawBuyDivergenceLine()
    string priceLine = "DIV_PRICE_BUY_" + IntegerToString(divergenceCount);
    string label     = "DIV_LABEL_BUY_"  + IntegerToString(divergenceCount);
    
+   //--- Clean up older objects to keep chart fast and clean
+   if(divergenceCount > 25)
+   {
+      ObjectDelete(0, "DIV_PRICE_BUY_" + IntegerToString(divergenceCount - 25));
+      ObjectDelete(0, "DIV_LABEL_BUY_" + IntegerToString(divergenceCount - 25));
+      ObjectDelete(0, "DIV_ENTRY_BUY_" + IntegerToString(divergenceCount - 25));
+      ObjectDelete(0, "DIV_ELABEL_BUY_" + IntegerToString(divergenceCount - 25));
+   }
+   
    ObjectCreate(0, priceLine, OBJ_TREND, 0, time1, priceAtLow2, time2, priceAtLow1);
    ObjectSetInteger(0, priceLine, OBJPROP_COLOR, InpBuyDivColor);
    ObjectSetInteger(0, priceLine, OBJPROP_WIDTH, InpDivLineWidth);
@@ -874,6 +883,15 @@ void DrawSellDivergenceLine()
    divergenceCount++;
    string priceLine = "DIV_PRICE_SELL_" + IntegerToString(divergenceCount);
    string label     = "DIV_LABEL_SELL_"  + IntegerToString(divergenceCount);
+   
+   //--- Clean up older objects to keep chart fast and clean
+   if(divergenceCount > 25)
+   {
+      ObjectDelete(0, "DIV_PRICE_SELL_" + IntegerToString(divergenceCount - 25));
+      ObjectDelete(0, "DIV_LABEL_SELL_" + IntegerToString(divergenceCount - 25));
+      ObjectDelete(0, "DIV_ENTRY_SELL_" + IntegerToString(divergenceCount - 25));
+      ObjectDelete(0, "DIV_ELABEL_SELL_" + IntegerToString(divergenceCount - 25));
+   }
    
    ObjectCreate(0, priceLine, OBJ_TREND, 0, time1, priceAtHigh2, time2, priceAtHigh1);
    ObjectSetInteger(0, priceLine, OBJPROP_COLOR, InpSellDivColor);
