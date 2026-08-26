@@ -669,10 +669,28 @@ void ExecuteSell()
 }
 
 //+------------------------------------------------------------------+
+//| Get pip-to-point scaling factor across different asset digits    |
+//+------------------------------------------------------------------+
+double GetPipPointFactor()
+{
+   if(_Digits == 3 || _Digits == 5)
+      return 1.0;
+   else if(_Digits == 2)
+      return 10.0;
+   return 1.0;
+}
+
+//+------------------------------------------------------------------+
 //| Manage open positions - Break-Even and Trailing Stop             |
 //+------------------------------------------------------------------+
 void ManageOpenPositions()
 {
+   double factor = GetPipPointFactor();
+   double beTargetPoints  = InpBEPoints * factor;
+   double beOffsetPoints  = InpBEPlusPoints * factor;
+   double trailActPoints  = InpTrailActivate * factor;
+   double trailStepPoints = InpTrailStep * factor;
+
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       if(!posInfo.SelectByIndex(i))
@@ -692,10 +710,10 @@ void ManageOpenPositions()
          double currentPrice = symInfo.Bid();
          double profitPoints = (currentPrice - openPrice) / point;
          
-         //--- Break-Even with small profit lock
-         if(InpUseBreakEven && profitPoints >= InpBEPoints)
+         //--- Break-Even with profit offset
+         if(InpUseBreakEven && profitPoints >= beTargetPoints)
          {
-            double beSL = NormalizeDouble(openPrice + InpBEPlusPoints * point, _Digits);
+            double beSL = NormalizeDouble(openPrice + beOffsetPoints * point, _Digits);
             if(currentSL < beSL)
             {
                if(trade.PositionModify(ticket, beSL, currentTP))
@@ -704,9 +722,9 @@ void ManageOpenPositions()
          }
          
          //--- Trailing Stop
-         if(InpUseTrailing && profitPoints >= InpTrailActivate)
+         if(InpUseTrailing && profitPoints >= trailActPoints)
          {
-            double trailSL = NormalizeDouble(currentPrice - InpTrailStep * point, _Digits);
+            double trailSL = NormalizeDouble(currentPrice - trailStepPoints * point, _Digits);
             if(trailSL > currentSL && trailSL > openPrice)
             {
                if(trade.PositionModify(ticket, trailSL, currentTP))
@@ -719,10 +737,10 @@ void ManageOpenPositions()
          double currentPrice = symInfo.Ask();
          double profitPoints = (openPrice - currentPrice) / point;
          
-         //--- Break-Even with small profit lock
-         if(InpUseBreakEven && profitPoints >= InpBEPoints)
+         //--- Break-Even with profit offset
+         if(InpUseBreakEven && profitPoints >= beTargetPoints)
          {
-            double beSL = NormalizeDouble(openPrice - InpBEPlusPoints * point, _Digits);
+            double beSL = NormalizeDouble(openPrice - beOffsetPoints * point, _Digits);
             if(currentSL > beSL || currentSL == 0)
             {
                if(trade.PositionModify(ticket, beSL, currentTP))
@@ -731,9 +749,9 @@ void ManageOpenPositions()
          }
          
          //--- Trailing Stop
-         if(InpUseTrailing && profitPoints >= InpTrailActivate)
+         if(InpUseTrailing && profitPoints >= trailActPoints)
          {
-            double trailSL = NormalizeDouble(currentPrice + InpTrailStep * point, _Digits);
+            double trailSL = NormalizeDouble(currentPrice + trailStepPoints * point, _Digits);
             if((trailSL < currentSL || currentSL == 0) && trailSL < openPrice)
             {
                if(trade.PositionModify(ticket, trailSL, currentTP))
