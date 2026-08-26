@@ -83,7 +83,8 @@ input bool     InpUseTrailing    = true;    // Use Trailing Stop
 input int      InpTrailActivate  = 50;      // Trailing Activation (Points)
 input int      InpTrailStep      = 15;      // Trailing Step (Points)
 
-input group "=== Divergence Line Settings ==="
+input group "=== Dashboard & Visual Settings ==="
+input bool     InpShowDashboard  = true;    // Show On-Chart HUD Dashboard
 input bool     InpDrawDivergence = true;    // Draw Divergence Lines
 input color    InpBuyDivColor    = clrLime; // Buy Divergence Line Color
 input color    InpSellDivColor   = clrRed;  // Sell Divergence Line Color
@@ -921,6 +922,9 @@ void DrawSimpleEntryLine(bool isBuy)
 //+------------------------------------------------------------------+
 void CreateDashboard()
 {
+   if(!InpShowDashboard)
+      return;
+      
    int x = 10, y = 30;
    int width = 280, height = 260;
    
@@ -954,6 +958,9 @@ void CreateDashboard()
 //+------------------------------------------------------------------+
 void UpdateDashboard(int spread)
 {
+   if(!InpShowDashboard)
+      return;
+      
    double stK[], stD[], cci[], atr[], sar[], ema[], emaF[], rsi[];
    CopyBuffer(handleStoch, MAIN_LINE, 0, 3, stK);
    CopyBuffer(handleStoch, SIGNAL_LINE, 0, 3, stD);
