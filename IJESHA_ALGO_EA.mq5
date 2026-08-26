@@ -42,6 +42,7 @@ input double   InpSLMultiplier   = 1.5;     // Stop Loss = ATR x Multiplier
 input double   InpTPMultiplier   = 2.0;     // Take Profit = ATR x Multiplier
 
 input group "=== Parabolic SAR Settings ==="
+input bool     InpUseSARFilter   = true;    // Use Parabolic SAR Filter
 input double   InpSARStep        = 0.02;    // SAR Step
 input double   InpSARMax         = 0.2;     // SAR Maximum
 
@@ -400,8 +401,11 @@ bool CheckBuySignal()
    }
    
    //--- 2. Price above Parabolic SAR (bullish)
-   if(close1 <= sarBuffer[1])
-      return false;
+   if(InpUseSARFilter)
+   {
+      if(close1 <= sarBuffer[1])
+         return false;
+   }
    
    //--- 3. Stochastic oversold or recent bullish recovery
    bool stochBuyValid = false;
@@ -494,8 +498,11 @@ bool CheckSellSignal()
    }
    
    //--- 2. Price below Parabolic SAR (bearish)
-   if(close1 >= sarBuffer[1])
-      return false;
+   if(InpUseSARFilter)
+   {
+      if(close1 >= sarBuffer[1])
+         return false;
+   }
    
    //--- 3. Stochastic overbought or recent bearish recovery
    bool stochSellValid = false;
