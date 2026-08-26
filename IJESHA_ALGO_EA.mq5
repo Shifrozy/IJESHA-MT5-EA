@@ -69,7 +69,7 @@ input double   InpRSIBuyMax      = 65.0;    // RSI Max for Buy (below = valid bu
 input double   InpRSISellMin     = 35.0;    // RSI Min for Sell (above = valid sell zone)
 
 input group "=== Session Filter ==="
-input bool     InpUseSessionFilter = true;  // Use Session Filter
+input bool     InpUseSessionFilter = false; // Use Session Filter (false = 24/5 Trading)
 input int      InpSessionStartHour = 7;     // Session Start Hour (Server Time)
 input int      InpSessionEndHour   = 20;    // Session End Hour (Server Time)
 
