@@ -52,10 +52,10 @@ input int      InpEMAPeriod      = 50;      // EMA Period
 input int      InpEMAFastPeriod  = 21;      // EMA Fast Period
 
 input group "=== RSI Filter ==="
-input bool     InpUseRSIFilter   = true;    // Use RSI Filter
+input bool     InpUseRSIFilter   = false;   // Use RSI Filter
 input int      InpRSIPeriod      = 14;      // RSI Period
-input double   InpRSIBuyMax      = 45.0;    // RSI Max for Buy (below = oversold zone)
-input double   InpRSISellMin     = 55.0;    // RSI Min for Sell (above = overbought zone)
+input double   InpRSIBuyMax      = 65.0;    // RSI Max for Buy (below = valid buy zone)
+input double   InpRSISellMin     = 35.0;    // RSI Min for Sell (above = valid sell zone)
 
 input group "=== Session Filter ==="
 input bool     InpUseSessionFilter = true;  // Use Session Filter
