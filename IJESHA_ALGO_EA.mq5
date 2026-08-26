@@ -15,6 +15,16 @@
 #include <Trade\SymbolInfo.mqh>
 
 //+------------------------------------------------------------------+
+//| Enums                                                            |
+//+------------------------------------------------------------------+
+enum ENUM_EMA_MODE
+{
+   EMA_MODE_PRICE_ONLY = 0,    // Price vs EMA50 Trend
+   EMA_MODE_CROSSOVER  = 1,    // EMA21 / EMA50 Alignment
+   EMA_MODE_COMBINED   = 2     // Price + EMA21 + EMA50 (Strict)
+};
+
+//+------------------------------------------------------------------+
 //| Input Parameters                                                  |
 //+------------------------------------------------------------------+
 input group "=== Trade Settings ==="
@@ -47,9 +57,10 @@ input double   InpSARStep        = 0.02;    // SAR Step
 input double   InpSARMax         = 0.2;     // SAR Maximum
 
 input group "=== EMA Trend Filter ==="
-input bool     InpUseEMAFilter   = true;    // Use EMA Trend Filter
-input int      InpEMAPeriod      = 50;      // EMA Period
-input int      InpEMAFastPeriod  = 21;      // EMA Fast Period
+input bool           InpUseEMAFilter   = true;                 // Use EMA Trend Filter
+input ENUM_EMA_MODE  InpEMAMode        = EMA_MODE_PRICE_ONLY;  // EMA Trend Filter Mode
+input int            InpEMAPeriod      = 50;                   // EMA Period (Slow)
+input int            InpEMAFastPeriod  = 21;                   // EMA Fast Period
 
 input group "=== RSI Filter ==="
 input bool     InpUseRSIFilter   = false;   // Use RSI Filter
@@ -389,15 +400,18 @@ bool CheckBuySignal()
    double close2 = iClose(_Symbol, PERIOD_CURRENT, 2);
    double open1  = iOpen(_Symbol, PERIOD_CURRENT, 1);
    
-   //--- 1. Price must be above EMA50 (trend filter)
+   //--- 1. EMA Trend Filter
    if(InpUseEMAFilter)
    {
-      if(close1 <= emaBuffer[1])
+      if(InpEMAMode == EMA_MODE_PRICE_ONLY && close1 <= emaBuffer[1])
          return false;
-      
-      //--- EMA21 above EMA50 (strong uptrend)
-      if(emaFastBuffer[1] <= emaBuffer[1])
+      else if(InpEMAMode == EMA_MODE_CROSSOVER && emaFastBuffer[1] <= emaBuffer[1])
          return false;
+      else if(InpEMAMode == EMA_MODE_COMBINED)
+      {
+         if(close1 <= emaBuffer[1] || emaFastBuffer[1] <= emaBuffer[1])
+            return false;
+      }
    }
    
    //--- 2. Price above Parabolic SAR (bullish)
@@ -486,15 +500,18 @@ bool CheckSellSignal()
    double close2 = iClose(_Symbol, PERIOD_CURRENT, 2);
    double open1  = iOpen(_Symbol, PERIOD_CURRENT, 1);
    
-   //--- 1. Price must be below EMA50 (trend filter)
+   //--- 1. EMA Trend Filter
    if(InpUseEMAFilter)
    {
-      if(close1 >= emaBuffer[1])
+      if(InpEMAMode == EMA_MODE_PRICE_ONLY && close1 >= emaBuffer[1])
          return false;
-      
-      //--- EMA21 below EMA50 (strong downtrend)
-      if(emaFastBuffer[1] >= emaBuffer[1])
+      else if(InpEMAMode == EMA_MODE_CROSSOVER && emaFastBuffer[1] >= emaBuffer[1])
          return false;
+      else if(InpEMAMode == EMA_MODE_COMBINED)
+      {
+         if(close1 >= emaBuffer[1] || emaFastBuffer[1] >= emaBuffer[1])
+            return false;
+      }
    }
    
    //--- 2. Price below Parabolic SAR (bearish)
