@@ -105,14 +105,28 @@ int            divergenceCount = 0;
 datetime       lastTradeTime   = 0;
 
 //+------------------------------------------------------------------+
+//| Setup optimal broker order filling mode                          |
+//+------------------------------------------------------------------+
+void SetupFillingMode()
+{
+   uint filling = (uint)SymbolInfoInteger(_Symbol, SYMBOL_FILLING_MODE);
+   if((filling & SYMBOL_FILLING_FOK) != 0)
+      trade.SetTypeFilling(ORDER_FILLING_FOK);
+   else if((filling & SYMBOL_FILLING_IOC) != 0)
+      trade.SetTypeFilling(ORDER_FILLING_IOC);
+   else
+      trade.SetTypeFilling(ORDER_FILLING_RETURN);
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                    |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   //--- Set magic number
+   //--- Set magic number and execution settings
    trade.SetExpertMagicNumber(InpMagicNumber);
-   trade.SetDeviationInPoints(10);
-   trade.SetTypeFilling(ORDER_FILLING_FOK);
+   trade.SetDeviationInPoints(20);
+   SetupFillingMode();
    
    //--- Initialize symbol info
    symInfo.Name(_Symbol);
