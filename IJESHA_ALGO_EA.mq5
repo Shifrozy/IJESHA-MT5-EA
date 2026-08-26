@@ -20,7 +20,8 @@
 input group "=== Trade Settings ==="
 input double   InpLotSize        = 0.02;    // Lot Size (Fixed)
 input int      InpMagicNumber    = 123456;  // Magic Number
-input int      InpMaxSpread      = 50;      // Maximum Spread (Points)
+input bool     InpAutoSpread     = true;    // Auto-Adaptive Spread Limit
+input int      InpMaxSpread      = 300;     // Maximum Spread (Points, 300 for Gold)
 input int      InpSignalLookback = 5;       // Signal Lookback Bars
 
 input group "=== Stochastic Settings ==="
@@ -226,6 +227,26 @@ void OnDeinit(const int reason)
 }
 
 //+------------------------------------------------------------------+
+//| Get dynamic effective maximum spread                             |
+//+------------------------------------------------------------------+
+int GetEffectiveMaxSpread()
+{
+   if(!InpAutoSpread)
+      return InpMaxSpread;
+   
+   string sym = _Symbol;
+   StringToUpper(sym);
+   if(StringFind(sym, "XAU") >= 0 || StringFind(sym, "GOLD") >= 0)
+      return MathMax(InpMaxSpread, 500);
+   else if(StringFind(sym, "BTC") >= 0 || StringFind(sym, "ETH") >= 0 || StringFind(sym, "CRYPTO") >= 0)
+      return MathMax(InpMaxSpread, 2000);
+   else if(StringFind(sym, "US30") >= 0 || StringFind(sym, "NAS") >= 0 || StringFind(sym, "GER") >= 0)
+      return MathMax(InpMaxSpread, 1000);
+      
+   return MathMax(InpMaxSpread, 100);
+}
+
+//+------------------------------------------------------------------+
 //| Expert tick function                                              |
 //+------------------------------------------------------------------+
 void OnTick()
@@ -255,8 +276,8 @@ void OnTick()
    if(HasOpenPosition())
       return;
    
-   //--- Check spread filter
-   if(currentSpread > InpMaxSpread)
+   //--- Check spread filter with dynamic limit
+   if(currentSpread > GetEffectiveMaxSpread())
       return;
    
    //--- Session filter
@@ -908,7 +929,7 @@ void UpdateDashboard(int spread)
    ObjectSetString(0, "IJESHA_EMA", OBJPROP_TEXT, "EMA50:      " + DoubleToString(ema[0], _Digits));
    
    //--- Spread
-   color spreadColor = (spread <= InpMaxSpread) ? clrLime : clrRed;
+   color spreadColor = (spread <= GetEffectiveMaxSpread()) ? clrLime : clrRed;
    ObjectSetString(0, "IJESHA_SPREAD", OBJPROP_TEXT, "Spread:     " + IntegerToString(spread) + " pts");
    ObjectSetInteger(0, "IJESHA_SPREAD", OBJPROP_COLOR, spreadColor);
    
