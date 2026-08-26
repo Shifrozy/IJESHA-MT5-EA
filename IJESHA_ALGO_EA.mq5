@@ -725,10 +725,13 @@ void ManageOpenPositions()
          if(InpUseTrailing && profitPoints >= trailActPoints)
          {
             double trailSL = NormalizeDouble(currentPrice - trailStepPoints * point, _Digits);
-            if(trailSL > currentSL && trailSL > openPrice)
+            if(trailSL > currentSL + point * 2 && trailSL > openPrice)
             {
-               if(trade.PositionModify(ticket, trailSL, currentTP))
-                  Print("Trail BUY #", ticket, " SL=", trailSL);
+               if((currentPrice - trailSL) >= GetMinStopDistance())
+               {
+                  if(trade.PositionModify(ticket, trailSL, currentTP))
+                     Print("Trail BUY #", ticket, " SL=", trailSL);
+               }
             }
          }
       }
@@ -752,10 +755,13 @@ void ManageOpenPositions()
          if(InpUseTrailing && profitPoints >= trailActPoints)
          {
             double trailSL = NormalizeDouble(currentPrice + trailStepPoints * point, _Digits);
-            if((trailSL < currentSL || currentSL == 0) && trailSL < openPrice)
+            if((trailSL < currentSL - point * 2 || currentSL == 0) && trailSL < openPrice)
             {
-               if(trade.PositionModify(ticket, trailSL, currentTP))
-                  Print("Trail SELL #", ticket, " SL=", trailSL);
+               if((trailSL - currentPrice) >= GetMinStopDistance())
+               {
+                  if(trade.PositionModify(ticket, trailSL, currentTP))
+                     Print("Trail SELL #", ticket, " SL=", trailSL);
+               }
             }
          }
       }
