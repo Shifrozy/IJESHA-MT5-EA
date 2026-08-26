@@ -425,21 +425,26 @@ bool CheckBuySignal()
    if(stochK[1] < stochD[1] && stochK[1] <= stochK[2])
       return false;
    
-   //--- 5. CCI was recently oversold
-   bool cciOversold = false;
-   for(int i = 1; i <= InpSignalLookback; i++)
+   //--- 4. CCI oversold or recent bullish reversal
+   bool cciBuyValid = false;
+   if(cciBuffer[1] < InpCCIBuyLevel || (cciBuffer[1] > InpCCIBuyLevel && cciBuffer[2] <= InpCCIBuyLevel))
+      cciBuyValid = true;
+   else
    {
-      if(cciBuffer[i] < InpCCIBuyLevel)
+      for(int i = 1; i <= InpSignalLookback; i++)
       {
-         cciOversold = true;
-         break;
+         if(cciBuffer[i] < InpCCIBuyLevel)
+         {
+            cciBuyValid = true;
+            break;
+         }
       }
    }
-   if(!cciOversold)
+   if(!cciBuyValid)
       return false;
    
-   //--- 6. CCI should now be recovering (rising)
-   if(cciBuffer[1] <= cciBuffer[2])
+   //--- CCI should be rising or oversold
+   if(cciBuffer[1] <= cciBuffer[2] && cciBuffer[1] > InpCCIBuyLevel)
       return false;
    
    //--- 7. RSI filter - must be in buy zone
@@ -514,21 +519,26 @@ bool CheckSellSignal()
    if(stochK[1] > stochD[1] && stochK[1] >= stochK[2])
       return false;
    
-   //--- 5. CCI was recently overbought
-   bool cciOverbought = false;
-   for(int i = 1; i <= InpSignalLookback; i++)
+   //--- 4. CCI overbought or recent bearish reversal
+   bool cciSellValid = false;
+   if(cciBuffer[1] > InpCCISellLevel || (cciBuffer[1] < InpCCISellLevel && cciBuffer[2] >= InpCCISellLevel))
+      cciSellValid = true;
+   else
    {
-      if(cciBuffer[i] > InpCCISellLevel)
+      for(int i = 1; i <= InpSignalLookback; i++)
       {
-         cciOverbought = true;
-         break;
+         if(cciBuffer[i] > InpCCISellLevel)
+         {
+            cciSellValid = true;
+            break;
+         }
       }
    }
-   if(!cciOverbought)
+   if(!cciSellValid)
       return false;
    
-   //--- 6. CCI should now be declining
-   if(cciBuffer[1] >= cciBuffer[2])
+   //--- CCI should be falling or overbought
+   if(cciBuffer[1] >= cciBuffer[2] && cciBuffer[1] < InpCCISellLevel)
       return false;
    
    //--- 7. RSI filter - must be in sell zone
