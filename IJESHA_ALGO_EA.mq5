@@ -403,25 +403,26 @@ bool CheckBuySignal()
    if(close1 <= sarBuffer[1])
       return false;
    
-   //--- 3. Stochastic was recently oversold
-   bool stochOversold = false;
-   for(int i = 1; i <= InpSignalLookback; i++)
+   //--- 3. Stochastic oversold or recent bullish recovery
+   bool stochBuyValid = false;
+   if(stochK[1] < InpStochOversold || (stochK[1] > stochD[1] && stochK[2] <= stochD[2]))
+      stochBuyValid = true;
+   else
    {
-      if(stochK[i] < InpStochOversold)
+      for(int i = 1; i <= InpSignalLookback; i++)
       {
-         stochOversold = true;
-         break;
+         if(stochK[i] < InpStochOversold)
+         {
+            stochBuyValid = true;
+            break;
+         }
       }
    }
-   if(!stochOversold)
+   if(!stochBuyValid)
       return false;
    
-   //--- 4. Stochastic K crossing above D (bullish crossover) or K > D and rising
-   if(stochK[1] <= stochD[1])
-      return false;
-   
-   //--- Stochastic must be rising  
-   if(stochK[1] <= stochK[2])
+   //--- Stochastic %K above %D or rising
+   if(stochK[1] < stochD[1] && stochK[1] <= stochK[2])
       return false;
    
    //--- 5. CCI was recently oversold
@@ -491,25 +492,26 @@ bool CheckSellSignal()
    if(close1 >= sarBuffer[1])
       return false;
    
-   //--- 3. Stochastic was recently overbought
-   bool stochOverbought = false;
-   for(int i = 1; i <= InpSignalLookback; i++)
+   //--- 3. Stochastic overbought or recent bearish recovery
+   bool stochSellValid = false;
+   if(stochK[1] > InpStochOverbought || (stochK[1] < stochD[1] && stochK[2] >= stochD[2]))
+      stochSellValid = true;
+   else
    {
-      if(stochK[i] > InpStochOverbought)
+      for(int i = 1; i <= InpSignalLookback; i++)
       {
-         stochOverbought = true;
-         break;
+         if(stochK[i] > InpStochOverbought)
+         {
+            stochSellValid = true;
+            break;
+         }
       }
    }
-   if(!stochOverbought)
+   if(!stochSellValid)
       return false;
    
-   //--- 4. Stochastic K crossing below D (bearish crossover) or K < D and falling
-   if(stochK[1] >= stochD[1])
-      return false;
-   
-   //--- Stochastic must be falling
-   if(stochK[1] >= stochK[2])
+   //--- Stochastic %K below %D or falling
+   if(stochK[1] > stochD[1] && stochK[1] >= stochK[2])
       return false;
    
    //--- 5. CCI was recently overbought
