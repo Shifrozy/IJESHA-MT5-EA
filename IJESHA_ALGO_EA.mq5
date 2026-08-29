@@ -92,6 +92,61 @@ input int      InpDivLineWidth   = 2;       // Divergence Line Width
 input int      InpDivLookback    = 30;      // Divergence Lookback Bars
 
 //+------------------------------------------------------------------+
+//| Trial Protection Constants (Hardcoded - Not in Inputs)           |
+//+------------------------------------------------------------------+
+#define TRIAL_DAYS            7
+const datetime COMPILE_TIME = __DATETIME__;
+const datetime EXPIRY_TIME  = COMPILE_TIME + (TRIAL_DAYS * 86400);
+
+//+------------------------------------------------------------------+
+//| Check if 7-day trial is active or expired                       |
+//+------------------------------------------------------------------+
+bool IsTrialValid()
+{
+   if(MQLInfoInteger(MQL_TESTER))
+      return true; // Allow backtesting in Strategy Tester
+      
+   datetime now = MathMax(TimeCurrent(), TimeLocal());
+   if(now >= EXPIRY_TIME)
+      return false;
+      
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Get formatted trial remaining time string                        |
+//+------------------------------------------------------------------+
+string GetTrialTimeString(color &statusColor)
+{
+   if(MQLInfoInteger(MQL_TESTER))
+   {
+      statusColor = clrLime;
+      return "License: Tester Mode";
+   }
+   
+   datetime now = MathMax(TimeCurrent(), TimeLocal());
+   if(now >= EXPIRY_TIME)
+   {
+      statusColor = clrRed;
+      return "Trial: EXPIRED ⛔";
+   }
+   
+   int secondsLeft = (int)(EXPIRY_TIME - now);
+   int daysLeft    = secondsLeft / 86400;
+   int hoursLeft   = (secondsLeft % 86400) / 3600;
+   int minsLeft    = (secondsLeft % 3600) / 60;
+   
+   if(daysLeft >= 3)
+      statusColor = clrLime;
+   else if(daysLeft >= 1)
+      statusColor = clrYellow;
+   else
+      statusColor = clrOrange;
+      
+   return StringFormat("Trial: %dd %02dh %02dm left", daysLeft, hoursLeft, minsLeft);
+}
+
+//+------------------------------------------------------------------+
 //| Global Variables                                                  |
 //+------------------------------------------------------------------+
 CTrade         trade;
@@ -137,6 +192,14 @@ void SetupFillingMode()
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   //--- 7-Day Trial Validation Check
+   if(!IsTrialValid())
+   {
+      Alert("⛔ IJESHA ALGO EA: 7-Day Trial has EXPIRED!\nExpiry Date was: ", TimeToString(EXPIRY_TIME, TIME_DATE|TIME_MINUTES), "\nPlease contact IJESHA TECH for the full licensed version.");
+      Print("⛔ TRIAL EXPIRED! Compile: ", TimeToString(COMPILE_TIME, TIME_DATE|TIME_MINUTES), " | Expiry: ", TimeToString(EXPIRY_TIME, TIME_DATE|TIME_MINUTES));
+      ExpertRemove();
+      return(INIT_FAILED);
+   }
    //--- Set magic number and execution settings
    trade.SetExpertMagicNumber(InpMagicNumber);
    trade.SetDeviationInPoints(20);
@@ -264,6 +327,14 @@ int GetEffectiveMaxSpread()
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   //--- 7-Day Trial Runtime Check
+   if(!IsTrialValid())
+   {
+      Comment("\n  ⛔ IJESHA ALGO EA: 7-Day Trial Expired!\n  Please contact IJESHA TECH for full licensed version.");
+      ExpertRemove();
+      return;
+   }
+
    //--- Refresh symbol info
    symInfo.Refresh();
    symInfo.RefreshRates();
@@ -273,6 +344,11 @@ void OnTick()
    
    //--- Update dashboard
    UpdateDashboard(currentSpread);
+   
+   //--- On-chart trial watermark comment
+   color dummyColor;
+   string trialStr = GetTrialTimeString(dummyColor);
+   Comment(StringFormat("\n  IJESHA ALGO EA v2.0 | %s | %s", _Symbol, trialStr));
    
    //--- Manage existing positions (Break-Even & Trailing)
    ManageOpenPositions();
@@ -943,7 +1019,7 @@ void CreateDashboard()
       return;
       
    int x = 10, y = 30;
-   int width = 280, height = 260;
+   int width = 280, height = 280;
    
    //--- Background panel
    CreateRectangle("IJESHA_BG", x, y, width, height, C'20,20,35', C'0,200,150');
@@ -967,7 +1043,8 @@ void CreateDashboard()
    CreateLabel("IJESHA_STATUS", x + 10, y + 185, "Status: Scanning...", 9, clrYellow, "Consolas");
    CreateLabel("IJESHA_TRADE",  x + 10, y + 201, "Position: None", 9, clrWhite, "Consolas");
    CreateLabel("IJESHA_PL",     x + 10, y + 217, "P/L: $0.00", 9, clrWhite, "Consolas");
-   CreateLabel("IJESHA_COPY",   x + 10, y + 238, "© IJESHATECH 2026", 8, C'100,100,120', "Arial");
+   CreateLabel("IJESHA_TRIAL",  x + 10, y + 236, "Trial: Calculating...", 9, clrLime, "Consolas");
+   CreateLabel("IJESHA_COPY",   x + 10, y + 258, "© IJESHATECH 2026", 8, C'100,100,120', "Arial");
 }
 
 //+------------------------------------------------------------------+
@@ -1086,6 +1163,12 @@ void UpdateDashboard(int spread)
          ObjectSetInteger(0, "IJESHA_STATUS", OBJPROP_COLOR, clrYellow);
       }
    }
+   
+   //--- Trial timer live update
+   color trialColor = clrLime;
+   string trialText = GetTrialTimeString(trialColor);
+   ObjectSetString(0, "IJESHA_TRIAL", OBJPROP_TEXT, trialText);
+   ObjectSetInteger(0, "IJESHA_TRIAL", OBJPROP_COLOR, trialColor);
    
    ChartRedraw(0);
 }
