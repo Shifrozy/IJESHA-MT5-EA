@@ -351,28 +351,21 @@ bool IsInTradingSession()
 }
 
 //+------------------------------------------------------------------+
-//| Copy all indicator buffers                                       |
+//| Copy all indicator buffers safely with bounds checking           |
 //+------------------------------------------------------------------+
 bool CopyIndicatorBuffers()
 {
-   int barsNeeded = MathMax(InpDivLookback + 5, InpSignalLookback + 5);
-   if(InpUseEMAFilter)
-      barsNeeded = MathMax(barsNeeded, MathMax(InpEMAPeriod, InpEMAFastPeriod) + 5);
+   int barsNeeded = MathMax(InpDivLookback + 10, MathMax(InpEMAPeriod, InpSignalLookback) + 10);
+   barsNeeded = MathMax(barsNeeded, 60);
    
-   if(CopyBuffer(handleStoch, MAIN_LINE, 0, barsNeeded, stochK) <= 0)     return false;
-   if(CopyBuffer(handleStoch, SIGNAL_LINE, 0, barsNeeded, stochD) <= 0)   return false;
-   if(CopyBuffer(handleCCI, 0, 0, barsNeeded, cciBuffer) <= 0)            return false;
-   if(CopyBuffer(handleATR, 0, 0, 5, atrBuffer) <= 0)                     return false;
-   if(CopyBuffer(handleSAR, 0, 0, 5, sarBuffer) <= 0)                     return false;
-   if(InpUseEMAFilter)
-   {
-      if(CopyBuffer(handleEMA, 0, 0, 5, emaBuffer) <= 0)                  return false;
-      if(CopyBuffer(handleEMAFast, 0, 0, 5, emaFastBuffer) <= 0)          return false;
-   }
-   if(InpUseRSIFilter)
-   {
-      if(CopyBuffer(handleRSI, 0, 0, 5, rsiBuffer) <= 0)                  return false;
-   }
+   if(CopyBuffer(handleStoch, MAIN_LINE, 0, barsNeeded, stochK) <= 0)       return false;
+   if(CopyBuffer(handleStoch, SIGNAL_LINE, 0, barsNeeded, stochD) <= 0)     return false;
+   if(CopyBuffer(handleCCI, 0, 0, barsNeeded, cciBuffer) <= 0)              return false;
+   if(CopyBuffer(handleATR, 0, 0, barsNeeded, atrBuffer) <= 0)              return false;
+   if(CopyBuffer(handleSAR, 0, 0, barsNeeded, sarBuffer) <= 0)              return false;
+   if(CopyBuffer(handleEMA, 0, 0, barsNeeded, emaBuffer) <= 0)              return false;
+   if(CopyBuffer(handleEMAFast, 0, 0, barsNeeded, emaFastBuffer) <= 0)      return false;
+   if(CopyBuffer(handleRSI, 0, 0, barsNeeded, rsiBuffer) <= 0)              return false;
    
    return true;
 }
@@ -485,10 +478,14 @@ bool CheckBuySignal()
    if(close1 <= open1)
       return false;
    
-   Print("BUY Signal! Stoch=", DoubleToString(stochK[1],2),
-         " CCI=", DoubleToString(cciBuffer[1],2),
-         " RSI=", DoubleToString(rsiBuffer[1],2),
-         " EMA50=", DoubleToString(emaBuffer[1], _Digits));
+   double stochVal = (ArraySize(stochK) > 1) ? stochK[1] : 0;
+   double cciVal   = (ArraySize(cciBuffer) > 1) ? cciBuffer[1] : 0;
+   double rsiVal   = (ArraySize(rsiBuffer) > 1) ? rsiBuffer[1] : 0;
+   double emaVal   = (ArraySize(emaBuffer) > 1) ? emaBuffer[1] : 0;
+   Print("BUY Signal! Stoch=", DoubleToString(stochVal,2),
+         " CCI=", DoubleToString(cciVal,2),
+         " RSI=", DoubleToString(rsiVal,2),
+         " EMA50=", DoubleToString(emaVal, _Digits));
    
    return true;
 }
@@ -585,10 +582,14 @@ bool CheckSellSignal()
    if(close1 >= open1)
       return false;
    
-   Print("SELL Signal! Stoch=", DoubleToString(stochK[1],2),
-         " CCI=", DoubleToString(cciBuffer[1],2),
-         " RSI=", DoubleToString(rsiBuffer[1],2),
-         " EMA50=", DoubleToString(emaBuffer[1], _Digits));
+   double stochValS = (ArraySize(stochK) > 1) ? stochK[1] : 0;
+   double cciValS   = (ArraySize(cciBuffer) > 1) ? cciBuffer[1] : 0;
+   double rsiValS   = (ArraySize(rsiBuffer) > 1) ? rsiBuffer[1] : 0;
+   double emaValS   = (ArraySize(emaBuffer) > 1) ? emaBuffer[1] : 0;
+   Print("SELL Signal! Stoch=", DoubleToString(stochValS,2),
+         " CCI=", DoubleToString(cciValS,2),
+         " RSI=", DoubleToString(rsiValS,2),
+         " EMA50=", DoubleToString(emaValS, _Digits));
    
    return true;
 }
@@ -802,7 +803,7 @@ void DrawBuyDivergenceLine()
       }
    }
    
-   if(priceLow1 == -1 || priceLow2 == -1)
+   if(priceLow1 == -1 || priceLow2 == -1 || priceLow1 >= ArraySize(stochK) || priceLow2 >= ArraySize(stochK))
    {
       DrawSimpleEntryLine(true);
       return;
@@ -872,7 +873,7 @@ void DrawSellDivergenceLine()
       }
    }
    
-   if(priceHigh1 == -1 || priceHigh2 == -1)
+   if(priceHigh1 == -1 || priceHigh2 == -1 || priceHigh1 >= ArraySize(stochK) || priceHigh2 >= ArraySize(stochK))
    {
       DrawSimpleEntryLine(false);
       return;
@@ -948,7 +949,7 @@ void DrawSimpleEntryLine(bool isBuy)
 //+------------------------------------------------------------------+
 void CreateDashboard()
 {
-   if(!InpShowDashboard)
+   if(!InpShowDashboard || (MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE)))
       return;
       
    int x = 10, y = 30;
@@ -984,7 +985,7 @@ void CreateDashboard()
 //+------------------------------------------------------------------+
 void UpdateDashboard(int spread)
 {
-   if(!InpShowDashboard)
+   if(!InpShowDashboard || (MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE)))
       return;
       
    double stK[], stD[], cci[], atr[], sar[], ema[], emaF[], rsi[];
