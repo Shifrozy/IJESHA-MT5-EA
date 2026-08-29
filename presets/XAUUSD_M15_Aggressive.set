@@ -1,11 +1,11 @@
 ;+------------------------------------------------------------------+
-;| IJESHA ALGO EA - XAUUSD (Gold) M15 Aggressive Preset             |
+;| IJESHA ALGO EA - XAUUSD (Gold) M15 High Win-Rate Preset          |
 ;+------------------------------------------------------------------+
 InpLotSize=0.02
 InpMagicNumber=123456
 InpAutoSpread=true
 InpMaxSpread=500
-InpSignalLookback=6
+InpSignalLookback=5
 InpStochK=14
 InpStochD=3
 InpStochSlowing=3
@@ -15,7 +15,7 @@ InpCCIPeriod=14
 InpCCIBuyLevel=-100.0
 InpCCISellLevel=100.0
 InpATRPeriod=14
-InpSLMultiplier=1.8
+InpSLMultiplier=2.0
 InpTPMultiplier=3.0
 InpUseSARFilter=true
 InpSARStep=0.02
@@ -32,11 +32,11 @@ InpUseSessionFilter=false
 InpSessionStartHour=7
 InpSessionEndHour=20
 InpUseBreakEven=true
-InpBEPoints=40
-InpBEPlusPoints=10
+InpBEPoints=300
+InpBEPlusPoints=30
 InpUseTrailing=true
-InpTrailActivate=60
-InpTrailStep=20
+InpTrailActivate=500
+InpTrailStep=100
 InpShowDashboard=true
 InpDrawDivergence=true
 InpBuyDivColor=65280

@@ -48,8 +48,8 @@ input double   InpCCISellLevel   = 100.0;   // CCI Sell Level
 
 input group "=== ATR Settings ==="
 input int      InpATRPeriod      = 14;      // ATR Period
-input double   InpSLMultiplier   = 1.5;     // Stop Loss = ATR x Multiplier
-input double   InpTPMultiplier   = 2.0;     // Take Profit = ATR x Multiplier
+input double   InpSLMultiplier   = 2.0;     // Stop Loss = ATR x Multiplier
+input double   InpTPMultiplier   = 3.0;     // Take Profit = ATR x Multiplier
 
 input group "=== Parabolic SAR Settings ==="
 input bool     InpUseSARFilter   = true;    // Use Parabolic SAR Filter
@@ -75,13 +75,13 @@ input int      InpSessionEndHour   = 20;    // Session End Hour (Server Time)
 
 input group "=== Break-Even Settings ==="
 input bool     InpUseBreakEven   = true;    // Use Break-Even
-input int      InpBEPoints       = 30;      // Break-Even Activation (Points)
-input int      InpBEPlusPoints   = 5;       // Break-Even Plus (Points above entry)
+input int      InpBEPoints       = 150;     // Break-Even Activation (Points - 15 pips)
+input int      InpBEPlusPoints   = 15;      // Break-Even Plus (Points - 1.5 pips above entry)
 
 input group "=== Trailing Stop Settings ==="
 input bool     InpUseTrailing    = true;    // Use Trailing Stop
-input int      InpTrailActivate  = 50;      // Trailing Activation (Points)
-input int      InpTrailStep      = 15;      // Trailing Step (Points)
+input int      InpTrailActivate  = 250;     // Trailing Activation (Points - 25 pips)
+input int      InpTrailStep      = 50;      // Trailing Step (Points - 5 pips)
 
 input group "=== Dashboard & Visual Settings ==="
 input bool     InpShowDashboard  = true;    // Show On-Chart HUD Dashboard
@@ -402,7 +402,7 @@ bool CheckBuySignal()
    double close2 = iClose(_Symbol, PERIOD_CURRENT, 2);
    double open1  = iOpen(_Symbol, PERIOD_CURRENT, 1);
    
-   //--- 1. EMA Trend Filter
+   //--- 1. EMA Trend Filter (Ensure macro trend is bullish)
    if(InpUseEMAFilter)
    {
       if(InpEMAMode == EMA_MODE_PRICE_ONLY && close1 <= emaBuffer[1])
@@ -416,65 +416,60 @@ bool CheckBuySignal()
       }
    }
    
-   //--- 2. Price above Parabolic SAR (bullish)
+   //--- 2. Price above Parabolic SAR (bullish SAR dot below price)
    if(InpUseSARFilter)
    {
       if(close1 <= sarBuffer[1])
          return false;
    }
    
-   //--- 3. Stochastic oversold or recent bullish recovery
-   bool stochBuyValid = false;
-   if(stochK[1] < InpStochOversold || (stochK[1] > stochD[1] && stochK[2] <= stochD[2]))
-      stochBuyValid = true;
-   else
+   //--- 3. Stochastic oversold dip & turnaround confirmation
+   bool wasStochOversold = false;
+   for(int i = 1; i <= InpSignalLookback; i++)
    {
-      for(int i = 1; i <= InpSignalLookback; i++)
+      if(stochK[i] <= InpStochOversold || (stochK[i] < 30.0 && stochD[i] < 30.0))
       {
-         if(stochK[i] < InpStochOversold)
-         {
-            stochBuyValid = true;
-            break;
-         }
+         wasStochOversold = true;
+         break;
       }
    }
-   if(!stochBuyValid)
+   
+   bool stochCrossover = (stochK[1] > stochD[1] && (stochK[2] <= stochD[2] || stochK[1] > stochK[2]));
+   bool stochExiting   = (stochK[1] > InpStochOversold && stochK[2] <= InpStochOversold);
+   
+   if(!(wasStochOversold && (stochCrossover || stochExiting)) && !(stochK[1] <= InpStochOversold && stochK[1] > stochD[1]))
       return false;
    
-   //--- Stochastic %K above %D or rising
-   if(stochK[1] < stochD[1] && stochK[1] <= stochK[2])
-      return false;
-   
-   //--- 4. CCI oversold or recent bullish reversal
-   bool cciBuyValid = false;
-   if(cciBuffer[1] < InpCCIBuyLevel || (cciBuffer[1] > InpCCIBuyLevel && cciBuffer[2] <= InpCCIBuyLevel))
-      cciBuyValid = true;
-   else
+   //--- 4. CCI oversold dip & recovery confirmation
+   bool wasCCIOversold = false;
+   for(int i = 1; i <= InpSignalLookback; i++)
    {
-      for(int i = 1; i <= InpSignalLookback; i++)
+      if(cciBuffer[i] <= InpCCIBuyLevel)
       {
-         if(cciBuffer[i] < InpCCIBuyLevel)
-         {
-            cciBuyValid = true;
-            break;
-         }
+         wasCCIOversold = true;
+         break;
       }
    }
-   if(!cciBuyValid)
-      return false;
    
-   //--- CCI should be rising or oversold
-   if(cciBuffer[1] <= cciBuffer[2] && cciBuffer[1] > InpCCIBuyLevel)
+   bool cciRising = (cciBuffer[1] > cciBuffer[2]);
+   if(!wasCCIOversold && cciBuffer[1] > InpCCIBuyLevel)
+   {
+      if(cciBuffer[1] <= 0 && !cciRising)
+         return false;
+   }
+   else if(!cciRising)
+   {
       return false;
+   }
    
-   //--- 7. RSI filter - must be in buy zone
+   //--- 5. RSI filter (if enabled)
    if(InpUseRSIFilter)
    {
       if(rsiBuffer[1] > InpRSIBuyMax)
          return false;
    }
    
-   //--- 8. Bullish candle confirmation (close > open)
+   //--- 6. Bullish candle confirmation (Close > Open)
    if(close1 <= open1)
       return false;
    
@@ -506,7 +501,7 @@ bool CheckSellSignal()
    double close2 = iClose(_Symbol, PERIOD_CURRENT, 2);
    double open1  = iOpen(_Symbol, PERIOD_CURRENT, 1);
    
-   //--- 1. EMA Trend Filter
+   //--- 1. EMA Trend Filter (Ensure macro trend is bearish)
    if(InpUseEMAFilter)
    {
       if(InpEMAMode == EMA_MODE_PRICE_ONLY && close1 >= emaBuffer[1])
@@ -520,65 +515,60 @@ bool CheckSellSignal()
       }
    }
    
-   //--- 2. Price below Parabolic SAR (bearish)
+   //--- 2. Price below Parabolic SAR (bearish SAR dot above price)
    if(InpUseSARFilter)
    {
       if(close1 >= sarBuffer[1])
          return false;
    }
    
-   //--- 3. Stochastic overbought or recent bearish recovery
-   bool stochSellValid = false;
-   if(stochK[1] > InpStochOverbought || (stochK[1] < stochD[1] && stochK[2] >= stochD[2]))
-      stochSellValid = true;
-   else
+   //--- 3. Stochastic overbought rally & turnaround confirmation
+   bool wasStochOverbought = false;
+   for(int i = 1; i <= InpSignalLookback; i++)
    {
-      for(int i = 1; i <= InpSignalLookback; i++)
+      if(stochK[i] >= InpStochOverbought || (stochK[i] > 70.0 && stochD[i] > 70.0))
       {
-         if(stochK[i] > InpStochOverbought)
-         {
-            stochSellValid = true;
-            break;
-         }
+         wasStochOverbought = true;
+         break;
       }
    }
-   if(!stochSellValid)
+   
+   bool stochCrossover = (stochK[1] < stochD[1] && (stochK[2] >= stochD[2] || stochK[1] < stochK[2]));
+   bool stochExiting   = (stochK[1] < InpStochOverbought && stochK[2] >= InpStochOverbought);
+   
+   if(!(wasStochOverbought && (stochCrossover || stochExiting)) && !(stochK[1] >= InpStochOverbought && stochK[1] < stochD[1]))
       return false;
    
-   //--- Stochastic %K below %D or falling
-   if(stochK[1] > stochD[1] && stochK[1] >= stochK[2])
-      return false;
-   
-   //--- 4. CCI overbought or recent bearish reversal
-   bool cciSellValid = false;
-   if(cciBuffer[1] > InpCCISellLevel || (cciBuffer[1] < InpCCISellLevel && cciBuffer[2] >= InpCCISellLevel))
-      cciSellValid = true;
-   else
+   //--- 4. CCI overbought rally & decline confirmation
+   bool wasCCIOverbought = false;
+   for(int i = 1; i <= InpSignalLookback; i++)
    {
-      for(int i = 1; i <= InpSignalLookback; i++)
+      if(cciBuffer[i] >= InpCCISellLevel)
       {
-         if(cciBuffer[i] > InpCCISellLevel)
-         {
-            cciSellValid = true;
-            break;
-         }
+         wasCCIOverbought = true;
+         break;
       }
    }
-   if(!cciSellValid)
-      return false;
    
-   //--- CCI should be falling or overbought
-   if(cciBuffer[1] >= cciBuffer[2] && cciBuffer[1] < InpCCISellLevel)
+   bool cciFalling = (cciBuffer[1] < cciBuffer[2]);
+   if(!wasCCIOverbought && cciBuffer[1] < InpCCISellLevel)
+   {
+      if(cciBuffer[1] >= 0 && !cciFalling)
+         return false;
+   }
+   else if(!cciFalling)
+   {
       return false;
+   }
    
-   //--- 7. RSI filter - must be in sell zone
+   //--- 5. RSI filter (if enabled)
    if(InpUseRSIFilter)
    {
       if(rsiBuffer[1] < InpRSISellMin)
          return false;
    }
    
-   //--- 8. Bearish candle confirmation (close < open)
+   //--- 6. Bearish candle confirmation (Close < Open)
    if(close1 >= open1)
       return false;
    
