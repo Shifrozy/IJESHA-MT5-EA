@@ -135,15 +135,16 @@ string GetTrialTimeString(color &statusColor)
    int daysLeft    = secondsLeft / 86400;
    int hoursLeft   = (secondsLeft % 86400) / 3600;
    int minsLeft    = (secondsLeft % 3600) / 60;
+   int secsLeft    = secondsLeft % 60;
    
    if(daysLeft >= 3)
-      statusColor = clrLime;
+      statusColor = C'0,255,150';
    else if(daysLeft >= 1)
       statusColor = clrYellow;
    else
       statusColor = clrOrange;
       
-   return StringFormat("Trial: %dd %02dh %02dm left", daysLeft, hoursLeft, minsLeft);
+   return StringFormat("Trial: %dd %02dh %02dm %02ds", daysLeft, hoursLeft, minsLeft, secsLeft);
 }
 
 //+------------------------------------------------------------------+
@@ -273,8 +274,12 @@ int OnInit()
    
    Print("IJESHA ALGO EA v2.0 initialized on ", _Symbol, " ", EnumToString(Period()));
    
-   //--- Create dashboard
+   //--- Create dashboard and perform immediate initial update
    CreateDashboard();
+   UpdateDashboard((int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD));
+   
+   //--- Start 1-second background timer for live trial countdown & dashboard refresh
+   EventSetTimer(1);
    
    return(INIT_SUCCEEDED);
 }
@@ -284,6 +289,12 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   //--- Kill background timer
+   EventKillTimer();
+   
+   //--- Clear chart comment
+   Comment("");
+   
    //--- Release indicator handles
    if(handleStoch   != INVALID_HANDLE) IndicatorRelease(handleStoch);
    if(handleCCI     != INVALID_HANDLE) IndicatorRelease(handleCCI);
@@ -300,6 +311,24 @@ void OnDeinit(const int reason)
    ObjectsDeleteAll(0, "DIV_");
    
    Print("IJESHA ALGO EA deinitialized. Reason: ", reason);
+}
+
+//+------------------------------------------------------------------+
+//| Timer event function (runs every 1 second continuously)          |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   symInfo.Refresh();
+   symInfo.RefreshRates();
+   int currentSpread = (int)symInfo.Spread();
+   
+   //--- Update dashboard values & trial timer every second
+   UpdateDashboard(currentSpread);
+   
+   //--- Update on-chart comment watermark
+   color dummyColor;
+   string trialStr = GetTrialTimeString(dummyColor);
+   Comment(StringFormat("\n  IJESHA ALGO EA v2.0 | %s | %s", _Symbol, trialStr));
 }
 
 //+------------------------------------------------------------------+
@@ -1019,7 +1048,7 @@ void CreateDashboard()
       return;
       
    int x = 10, y = 30;
-   int width = 280, height = 280;
+   int width = 280, height = 290;
    
    //--- Background panel
    CreateRectangle("IJESHA_BG", x, y, width, height, C'20,20,35', C'0,200,150');
@@ -1043,8 +1072,11 @@ void CreateDashboard()
    CreateLabel("IJESHA_STATUS", x + 10, y + 185, "Status: Scanning...", 9, clrYellow, "Consolas");
    CreateLabel("IJESHA_TRADE",  x + 10, y + 201, "Position: None", 9, clrWhite, "Consolas");
    CreateLabel("IJESHA_PL",     x + 10, y + 217, "P/L: $0.00", 9, clrWhite, "Consolas");
-   CreateLabel("IJESHA_TRIAL",  x + 10, y + 236, "Trial: Calculating...", 9, clrLime, "Consolas");
-   CreateLabel("IJESHA_COPY",   x + 10, y + 258, "© IJESHATECH 2026", 8, C'100,100,120', "Arial");
+   
+   color tClr = C'0,255,180';
+   string tStr = GetTrialTimeString(tClr);
+   CreateLabel("IJESHA_TRIAL",  x + 10, y + 236, tStr, 9, tClr, "Consolas");
+   CreateLabel("IJESHA_COPY",   x + 10, y + 260, "© IJESHATECH 2026", 8, C'120,120,150', "Arial");
 }
 
 //+------------------------------------------------------------------+
