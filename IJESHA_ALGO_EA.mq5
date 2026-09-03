@@ -33,6 +33,8 @@ input int      InpMagicNumber    = 123456;  // Magic Number
 input bool     InpAutoSpread     = true;    // Auto-Adaptive Spread Limit
 input int      InpMaxSpread      = 300;     // Maximum Spread (Points, 300 for Gold)
 input int      InpSignalLookback = 5;       // Signal Lookback Bars
+input int      InpMaxTradesDay   = 10;      // Max Trades Per Day
+input int      InpMaxConcurrent  = 3;       // Max Concurrent Open Positions
 
 input group "=== Stochastic Settings ==="
 input int      InpStochK         = 14;      // Stochastic %K Period
@@ -75,13 +77,13 @@ input int      InpSessionEndHour   = 20;    // Session End Hour (Server Time)
 
 input group "=== Break-Even Settings ==="
 input bool     InpUseBreakEven   = true;    // Use Break-Even
-input int      InpBEPoints       = 150;     // Break-Even Activation (Points - 15 pips)
-input int      InpBEPlusPoints   = 15;      // Break-Even Plus (Points - 1.5 pips above entry)
+input int      InpBEPoints       = 60;      // Break-Even Activation (Points - 6 pips)
+input int      InpBEPlusPoints   = 5;       // Break-Even Plus (Points - 0.5 pip above entry)
 
 input group "=== Trailing Stop Settings ==="
 input bool     InpUseTrailing    = true;    // Use Trailing Stop
-input int      InpTrailActivate  = 250;     // Trailing Activation (Points - 25 pips)
-input int      InpTrailStep      = 50;      // Trailing Step (Points - 5 pips)
+input int      InpTrailActivate  = 100;     // Trailing Activation (Points - 10 pips)
+input int      InpTrailStep      = 30;      // Trailing Step (Points - 3 pips)
 
 input group "=== Dashboard & Visual Settings ==="
 input bool     InpShowDashboard  = true;    // Show On-Chart HUD Dashboard
@@ -390,8 +392,12 @@ void OnTick()
    if(!CopyIndicatorBuffers())
       return;
    
-   //--- Check if we already have a position on this symbol
-   if(HasOpenPosition())
+   //--- Check max concurrent open positions for this symbol
+   if(CountOpenPositions() >= InpMaxConcurrent)
+      return;
+   
+   //--- Check max trades per day limit
+   if(CountTodayTrades() >= InpMaxTradesDay)
       return;
    
    //--- Check spread filter with dynamic limit
@@ -402,9 +408,9 @@ void OnTick()
    if(InpUseSessionFilter && !IsInTradingSession())
       return;
    
-   //--- Minimum bar spacing (prevent rapid re-entry)
+   //--- Minimum bar spacing (prevent same-bar re-entry)
    datetime currentTime = iTime(_Symbol, PERIOD_CURRENT, 0);
-   if(currentTime - lastTradeTime < PeriodSeconds(PERIOD_CURRENT) * 3)
+   if(currentTime - lastTradeTime < PeriodSeconds(PERIOD_CURRENT) * 1)
       return;
    
    //--- Check for BUY signal
@@ -476,19 +482,62 @@ bool CopyIndicatorBuffers()
 }
 
 //+------------------------------------------------------------------+
-//| Check if position exists for this symbol with our magic          |
+//| Count open positions for this symbol with our magic              |
 //+------------------------------------------------------------------+
-bool HasOpenPosition()
+int CountOpenPositions()
 {
+   int count = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       if(posInfo.SelectByIndex(i))
       {
          if(posInfo.Symbol() == _Symbol && posInfo.Magic() == InpMagicNumber)
-            return true;
+            count++;
       }
    }
-   return false;
+   return count;
+}
+
+//+------------------------------------------------------------------+
+//| Count trades opened today (for daily trade limit)                |
+//+------------------------------------------------------------------+
+int CountTodayTrades()
+{
+   int count = 0;
+   datetime todayStart = StringToTime(TimeToString(TimeCurrent(), TIME_DATE));
+   
+   //--- Count currently open positions opened today
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(posInfo.SelectByIndex(i))
+      {
+         if(posInfo.Symbol() == _Symbol && posInfo.Magic() == InpMagicNumber)
+         {
+            if(posInfo.Time() >= todayStart)
+               count++;
+         }
+      }
+   }
+   
+   //--- Count deals closed today from history
+   if(HistorySelect(todayStart, TimeCurrent()))
+   {
+      for(int i = HistoryDealsTotal() - 1; i >= 0; i--)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket > 0)
+         {
+            if(HistoryDealGetString(ticket, DEAL_SYMBOL) == _Symbol &&
+               HistoryDealGetInteger(ticket, DEAL_MAGIC) == InpMagicNumber &&
+               HistoryDealGetInteger(ticket, DEAL_ENTRY) == DEAL_ENTRY_IN)
+            {
+               count++;
+            }
+         }
+      }
+   }
+   
+   return count;
 }
 
 //+------------------------------------------------------------------+
@@ -528,44 +577,30 @@ bool CheckBuySignal()
          return false;
    }
    
-   //--- 3. Stochastic oversold dip & turnaround confirmation
+   //--- 3. Stochastic momentum confirmation (relaxed for frequency)
+   //--- Buy when: %K is rising AND (%K crossed above %D OR was recently oversold)
+   bool stochBullish = (stochK[1] > stochD[1]);
+   bool stochRising  = (stochK[1] > stochK[2]);
    bool wasStochOversold = false;
    for(int i = 1; i <= InpSignalLookback; i++)
    {
-      if(stochK[i] <= InpStochOversold || (stochK[i] < 30.0 && stochD[i] < 30.0))
+      if(stochK[i] <= InpStochOversold + 10.0)
       {
          wasStochOversold = true;
          break;
       }
    }
    
-   bool stochCrossover = (stochK[1] > stochD[1] && (stochK[2] <= stochD[2] || stochK[1] > stochK[2]));
-   bool stochExiting   = (stochK[1] > InpStochOversold && stochK[2] <= InpStochOversold);
-   
-   if(!(wasStochOversold && (stochCrossover || stochExiting)) && !(stochK[1] <= InpStochOversold && stochK[1] > stochD[1]))
+   if(!stochBullish && !wasStochOversold)
+      return false;
+   if(!stochRising && stochK[1] > 50.0)
       return false;
    
-   //--- 4. CCI oversold dip & recovery confirmation
-   bool wasCCIOversold = false;
-   for(int i = 1; i <= InpSignalLookback; i++)
-   {
-      if(cciBuffer[i] <= InpCCIBuyLevel)
-      {
-         wasCCIOversold = true;
-         break;
-      }
-   }
-   
+   //--- 4. CCI momentum filter (relaxed - just needs to be rising)
    bool cciRising = (cciBuffer[1] > cciBuffer[2]);
-   if(!wasCCIOversold && cciBuffer[1] > InpCCIBuyLevel)
-   {
-      if(cciBuffer[1] <= 0 && !cciRising)
-         return false;
-   }
-   else if(!cciRising)
-   {
+   bool cciBullish = (cciBuffer[1] > -50.0);
+   if(!cciRising && !cciBullish)
       return false;
-   }
    
    //--- 5. RSI filter (if enabled)
    if(InpUseRSIFilter)
@@ -573,10 +608,6 @@ bool CheckBuySignal()
       if(rsiBuffer[1] > InpRSIBuyMax)
          return false;
    }
-   
-   //--- 6. Bullish candle confirmation (Close > Open)
-   if(close1 <= open1)
-      return false;
    
    double stochVal = (ArraySize(stochK) > 1) ? stochK[1] : 0;
    double cciVal   = (ArraySize(cciBuffer) > 1) ? cciBuffer[1] : 0;
@@ -627,44 +658,30 @@ bool CheckSellSignal()
          return false;
    }
    
-   //--- 3. Stochastic overbought rally & turnaround confirmation
+   //--- 3. Stochastic momentum confirmation (relaxed for frequency)
+   //--- Sell when: %K is falling AND (%K crossed below %D OR was recently overbought)
+   bool stochBearish = (stochK[1] < stochD[1]);
+   bool stochFalling = (stochK[1] < stochK[2]);
    bool wasStochOverbought = false;
    for(int i = 1; i <= InpSignalLookback; i++)
    {
-      if(stochK[i] >= InpStochOverbought || (stochK[i] > 70.0 && stochD[i] > 70.0))
+      if(stochK[i] >= InpStochOverbought - 10.0)
       {
          wasStochOverbought = true;
          break;
       }
    }
    
-   bool stochCrossover = (stochK[1] < stochD[1] && (stochK[2] >= stochD[2] || stochK[1] < stochK[2]));
-   bool stochExiting   = (stochK[1] < InpStochOverbought && stochK[2] >= InpStochOverbought);
-   
-   if(!(wasStochOverbought && (stochCrossover || stochExiting)) && !(stochK[1] >= InpStochOverbought && stochK[1] < stochD[1]))
+   if(!stochBearish && !wasStochOverbought)
+      return false;
+   if(!stochFalling && stochK[1] < 50.0)
       return false;
    
-   //--- 4. CCI overbought rally & decline confirmation
-   bool wasCCIOverbought = false;
-   for(int i = 1; i <= InpSignalLookback; i++)
-   {
-      if(cciBuffer[i] >= InpCCISellLevel)
-      {
-         wasCCIOverbought = true;
-         break;
-      }
-   }
-   
+   //--- 4. CCI momentum filter (relaxed - just needs to be falling)
    bool cciFalling = (cciBuffer[1] < cciBuffer[2]);
-   if(!wasCCIOverbought && cciBuffer[1] < InpCCISellLevel)
-   {
-      if(cciBuffer[1] >= 0 && !cciFalling)
-         return false;
-   }
-   else if(!cciFalling)
-   {
+   bool cciBearish = (cciBuffer[1] < 50.0);
+   if(!cciFalling && !cciBearish)
       return false;
-   }
    
    //--- 5. RSI filter (if enabled)
    if(InpUseRSIFilter)
@@ -672,10 +689,6 @@ bool CheckSellSignal()
       if(rsiBuffer[1] < InpRSISellMin)
          return false;
    }
-   
-   //--- 6. Bearish candle confirmation (Close < Open)
-   if(close1 >= open1)
-      return false;
    
    double stochValS = (ArraySize(stochK) > 1) ? stochK[1] : 0;
    double cciValS   = (ArraySize(cciBuffer) > 1) ? cciBuffer[1] : 0;
